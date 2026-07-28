@@ -42,9 +42,10 @@
     padding:10px 22px; border-radius:6px; letter-spacing:.08em; text-transform:uppercase;}
 
   #screen-attract{background:radial-gradient(ellipse at center, #3a4530 0%, var(--ink) 75%);}
+  #screen-attract .eyebrow{display:block; margin-bottom:18px;}
   #screen-attract .stencil-title{font-size:min(10vw,96px);}
   #screen-attract .sub{font-size:20px; max-width:640px; margin:0 auto 10px; color:var(--steel);}
-  #screen-attract .tap-hint{margin-top:36px; font-family:var(--font-mono); font-size:16px; color:var(--caution); letter-spacing:.15em; animation:pulse 1.6s ease-in-out infinite;}
+  #screen-attract .attract-btn-row{margin-top:36px; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap;}
   @keyframes pulse{0%,100%{opacity:.4;}50%{opacity:1;}}
 
   #screen-instructions .stencil-title{font-size:48px;}
@@ -63,12 +64,9 @@
   .stage-wrap{flex:1; position:relative; display:flex; align-items:center; justify-content:center; background:#000;}
   #stage{position:relative; background:#000;}
   #stage img.bg{position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:fill;}
-  .item-hit{position:absolute; cursor:pointer; transition:opacity .3s ease, transform .3s ease;}
+  .item-hit{position:absolute; cursor:pointer; transition:opacity .2s ease;}
   .item-hit img{width:100%; height:100%; display:block; pointer-events:none;}
-  .item-hit.found{opacity:0.15; transform:scale(0.9); pointer-events:none;}
-  .item-hit .ring{position:absolute; inset:-8%; border:3px solid var(--caution); border-radius:14px; opacity:0;}
-  .item-hit.pulse-ring .ring{animation:ringPulse 1.4s ease-out infinite;}
-  @keyframes ringPulse{0%{opacity:.55; transform:scale(0.96);}100%{opacity:0; transform:scale(1.12);}}
+  .item-hit.found{opacity:0; pointer-events:none;}
 
   .popup{position:absolute; font-family:var(--font-display); font-size:24px; color:var(--caution); pointer-events:none; animation:floatUp 1s ease-out forwards; z-index:20;}
   @keyframes floatUp{0%{opacity:1; transform:translateY(0);}100%{opacity:0; transform:translateY(-50px);}}
@@ -88,8 +86,8 @@
   #screen-complete .result-score{font-family:var(--font-mono); font-size:44px; color:var(--caution);}
   .dogtag{width:340px; padding:16px 24px; margin:12px auto 6px; background:var(--steel); color:var(--ink); border-radius:22px; font-family:var(--font-mono); font-size:24px; letter-spacing:.15em; text-align:center; min-height:32px; box-shadow:inset 0 2px 4px rgba(0,0,0,.3);}
   .dogtag.placeholder{color:var(--steel-dark);}
-  .keyboard{display:grid; grid-template-columns:repeat(10,1fr); gap:7px; max-width:540px; margin:16px auto;}
-  .key{background:var(--ground-dark); border:2px solid var(--steel-dark); color:var(--khaki); font-family:var(--font-body); font-weight:600; font-size:19px; border-radius:6px; padding:11px 0; text-transform:uppercase;}
+  .keyboard{display:grid; grid-template-columns:repeat(10,1fr); gap:12px; max-width:620px; width:92vw; margin:20px auto;}
+  .key{background:var(--ground-dark); border:2px solid var(--steel-dark); color:var(--khaki); font-family:var(--font-body); font-weight:600; font-size:20px; border-radius:8px; padding:16px 0; text-transform:uppercase; line-height:1;}
   .key:active{background:var(--steel-dark);}
   .key.wide{grid-column:span 5;}
   .raffle-note{font-family:var(--font-mono); font-size:13px; color:var(--caution); letter-spacing:.1em; margin-top:12px; max-width:420px;}
@@ -110,11 +108,14 @@
 <div class="app" id="app">
 
   <div class="screen active" id="screen-attract">
-    <div class="eyebrow">OML Conference &middot; IT Surplus Program</div>
+    <div class="eyebrow">OMAG &middot; OML Conference 2026</div>
     <h1 class="stencil-title" data-text="SARGE'S SURPLUS HUNT">SARGE'S SURPLUS HUNT</h1>
     <div class="tape-divider"></div>
     <p class="sub">Sarge's yard is full of gear that doesn't belong. Find every item on your list before time's up to enter the raffle.</p>
-    <div class="tap-hint">TAP ANYWHERE TO REPORT FOR DUTY</div>
+    <div class="attract-btn-row">
+      <button class="ghost-btn" id="btn-start-attract">START</button>
+      <button class="ghost-btn" id="btn-view-leaderboard">VIEW LEADERBOARD</button>
+    </div>
   </div>
 
   <div class="screen" id="screen-instructions">
@@ -132,7 +133,7 @@
   <div class="screen" id="screen-game">
     <div class="game-main">
       <div class="hud">
-        <div class="hud-block" id="found-block"><span class="hud-label">Recovered</span><span id="found-count">0/8</span></div>
+        <div class="hud-block" id="found-block"><span class="hud-label">Recovered</span><span id="found-count">0/6</span></div>
         <div class="timerbar-wrap"><div id="timerbar"></div></div>
         <div class="hud-block" id="timer-block"><span class="hud-label">Time</span><span id="timer-count">60</span></div>
       </div>
@@ -150,7 +151,7 @@
     <div class="eyebrow" id="complete-eyebrow">Mission Report</div>
     <h1 class="stencil-title" data-text="YARD CLEARED">YARD CLEARED</h1>
     <div class="result-card">
-      <div class="result-line" id="result-found">Recovered: 8/8</div>
+      <div class="result-line" id="result-found">Recovered: 6/6</div>
       <div class="result-line" id="result-time">Time remaining: 12s</div>
       <div class="result-score" id="result-score">1240</div>
     </div>
@@ -195,7 +196,7 @@
     {"id":"omaglogo","label":"OMAG Logo","x":61.6667,"y":27.6852,"w":5.0,"h":4.537,"sprite":"assets/items/omaglogo.png","icon":"assets/keys/omaglogo.png"}
   ];
   var BG = 'assets/background.jpg';
-  var ROUND_SIZE = 8; // items shown per round, chosen randomly from the pool above
+  var ROUND_SIZE = 6; // items shown per round, chosen randomly from the pool above
 
   var screens = {
     attract: document.getElementById('screen-attract'),
@@ -211,7 +212,8 @@
   function clearIdle(){ clearTimeout(idleTimer); }
   function resetToAttract(){ clearIdle(); stopGameTimers(); show('attract'); }
 
-  document.getElementById('screen-attract').addEventListener('click', function(){ show('instructions'); });
+  document.getElementById('btn-start-attract').addEventListener('click', function(e){ e.stopPropagation(); show('instructions'); });
+  document.getElementById('btn-view-leaderboard').addEventListener('click', function(e){ e.stopPropagation(); showLeaderboard(); });
   document.getElementById('btn-start-hunt').addEventListener('click', function(e){ e.stopPropagation(); startGame(); });
   document.getElementById('staff-reset').addEventListener('click', function(e){ e.stopPropagation(); resetToAttract(); });
 
@@ -252,16 +254,13 @@
     activeItems.forEach(function(itemObj){
       var d = itemObj.def;
       var g = document.createElement('div');
-      g.className = 'item-hit pulse-ring';
+      g.className = 'item-hit';
       g.style.left = d.x + '%';
       g.style.top = d.y + '%';
       g.style.width = d.w + '%';
       g.style.height = d.h + '%';
-      var ring = document.createElement('div');
-      ring.className = 'ring';
       var img = document.createElement('img');
       img.src = d.sprite;
-      g.appendChild(ring);
       g.appendChild(img);
       stage.appendChild(g);
       itemObj.el = g;
@@ -300,7 +299,7 @@
     foundCount++;
     document.getElementById('found-count').textContent = foundCount + '/' + ROUND_SIZE;
     itemObj.el.classList.add('found');
-    itemObj.el.classList.remove('pulse-ring');
+    setTimeout(function(){ itemObj.el.style.visibility = 'hidden'; }, 200);
     var keyRow = document.getElementById('key-' + itemObj.def.id);
     if(keyRow) keyRow.classList.add('found');
     spawnPopup();
