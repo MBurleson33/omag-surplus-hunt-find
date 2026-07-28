@@ -48,8 +48,9 @@
   #screen-attract .attract-btn-row{margin-top:36px; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap;}
   @keyframes pulse{0%,100%{opacity:.4;}50%{opacity:1;}}
 
-  #screen-instructions .stencil-title{font-size:48px;}
-  #screen-instructions .briefing{max-width:680px; font-size:19px; line-height:1.5; color:var(--khaki); background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:10px; padding:24px 30px; margin:10px 0 26px;}
+  #screen-instructions .eyebrow{display:block; margin-bottom:14px;}
+  #screen-instructions .stencil-title{font-size:48px; margin-bottom:30px;}
+  #screen-instructions .briefing{max-width:680px; font-size:19px; line-height:1.9; color:var(--khaki); background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:10px; padding:30px 36px; margin:0 0 34px;}
   #screen-instructions .briefing b{color:var(--caution);}
 
   #screen-game{justify-content:flex-start; flex-direction:row; align-items:stretch;}
@@ -597,6 +598,29 @@
   }
   buildKeyboard();
 
+  // Physical keyboard support: if a real keyboard is plugged into the kiosk,
+  // typing works the same as tapping the on-screen keys -- letters/digits
+  // go into whichever field is active, Tab cycles fields, Backspace deletes,
+  // Enter submits. Only listens while the name/contact entry screen is up.
+  document.addEventListener('keydown', function(e){
+    if(!screens.complete.classList.contains('active')) return;
+
+    if(e.key === 'Backspace'){
+      e.preventDefault();
+      backspace();
+    } else if(e.key === 'Tab'){
+      e.preventDefault();
+      activeField = activeField === 'first' ? 'last' : (activeField === 'last' ? 'contact' : 'first');
+      updateActiveFieldStyles();
+    } else if(e.key === 'Enter'){
+      e.preventDefault();
+      document.getElementById('btn-submit-name').click();
+    } else if(e.key.length === 1){
+      e.preventDefault();
+      typeChar(e.key);
+    }
+  });
+
   document.getElementById('btn-submit-name').addEventListener('click', function(e){
     e.stopPropagation();
     var finalFirst = currentFirst.trim();
@@ -632,14 +656,29 @@
   // If the same person plays again, their entry is only updated when the
   // new score beats their previous best -- otherwise their existing entry
   // (and raffle eligibility) is left alone.
+  // Normalizes a contact value for duplicate-matching purposes only (the
+  // original, as-typed value is still what's stored/displayed/exported).
+  // Emails are matched case-insensitively; anything without an "@" is
+  // treated as a phone number and stripped down to digits only, so
+  // "555-123-4567", "(555) 123-4567", and "5551234567" all match as the
+  // same person even though they're typed differently.
+  function normalizeContactKey(contact){
+    var trimmed = (contact || '').trim();
+    if(trimmed.indexOf('@') !== -1){
+      return 'email:' + trimmed.toLowerCase();
+    }
+    var digitsOnly = trimmed.replace(/\D/g, '');
+    return digitsOnly.length > 0 ? 'phone:' + digitsOnly : 'raw:' + trimmed.toLowerCase();
+  }
+
   function saveEntry(firstName, lastName, contact, score){
     try{
       var list = [];
       var existing = localStorage.getItem(LB_KEY);
       if(existing){ list = JSON.parse(existing); }
 
-      var key = contact.trim().toLowerCase();
-      var idx = list.findIndex(function(e){ return (e.contact||'').trim().toLowerCase() === key; });
+      var key = normalizeContactKey(contact);
+      var idx = list.findIndex(function(e){ return normalizeContactKey(e.contact) === key; });
 
       if(idx === -1){
         list.push({firstName:firstName, lastName:lastName, contact:contact, score:score, ts:Date.now()});
