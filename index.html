@@ -88,6 +88,8 @@
   .dogtag{width:340px; padding:16px 24px; margin:8px auto; background:var(--steel); color:var(--ink); border-radius:22px; font-family:var(--font-mono); font-size:24px; letter-spacing:.15em; text-align:center; min-height:32px; box-shadow:inset 0 2px 4px rgba(0,0,0,.3); border:3px solid transparent; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .dogtag.placeholder{color:var(--steel-dark);}
   .dogtag.active-field{border-color:var(--caution);}
+  .name-row{display:flex; gap:12px; justify-content:center; width:min(92vw,420px); margin:0 auto;}
+  .name-row .dogtag{width:auto; flex:1; margin:8px 0; font-size:19px; padding:16px 12px;}
   #contact-display{font-size:18px; width:min(92vw,420px); letter-spacing:.05em;}
   .raffle-warn{font-family:var(--font-mono); font-size:13px; color:#ffb199; letter-spacing:.05em; margin-top:10px; max-width:420px;}
   .keyboard{display:grid; grid-template-columns:repeat(10,1fr); gap:12px; max-width:620px; width:92vw; margin:20px auto;}
@@ -161,7 +163,10 @@
       <div class="result-score" id="result-score">1240</div>
     </div>
     <div class="eyebrow">Stamp your dog tag to enter</div>
-    <div class="dogtag placeholder active-field" id="name-display">YOUR NAME</div>
+    <div class="name-row">
+      <div class="dogtag placeholder active-field" id="first-name-display">FIRST NAME</div>
+      <div class="dogtag placeholder" id="last-name-display">LAST NAME</div>
+    </div>
     <div class="dogtag placeholder" id="contact-display">EMAIL OR PHONE</div>
     <div class="keyboard" id="keyboard"></div>
     <button class="big-btn" id="btn-submit-name" style="margin-top:6px;">LOCK IT IN</button>
@@ -257,9 +262,9 @@
       return s;
     }
 
-    var rows = [['Name','Contact','Score','Entered At']];
+    var rows = [['First Name','Last Name','Contact','Score','Entered At']];
     list.forEach(function(e){
-      rows.push([e.name, e.contact||'', e.score, new Date(e.ts).toLocaleString()]);
+      rows.push([e.firstName||'', e.lastName||'', e.contact||'', e.score, new Date(e.ts).toLocaleString()]);
     });
     var csv = rows.map(function(r){ return r.map(csvEscape).join(','); }).join('\n');
 
@@ -444,46 +449,57 @@
     armIdleReset(45);
   }
 
-  var currentName = '';
+  var currentFirst = '';
+  var currentLast = '';
   var currentContact = '';
-  var activeField = 'name';
+  var activeField = 'first';
   var MAX_NAME_LEN = 16;
   var MAX_CONTACT_LEN = 40;
-  var nameDisplay = document.getElementById('name-display');
+  var firstNameDisplay = document.getElementById('first-name-display');
+  var lastNameDisplay = document.getElementById('last-name-display');
   var contactDisplay = document.getElementById('contact-display');
   var raffleNote = document.getElementById('raffle-note');
   var raffleWarn = document.getElementById('raffle-warn');
 
   function resetNameEntry(){
-    currentName=''; currentContact=''; activeField='name';
+    currentFirst=''; currentLast=''; currentContact=''; activeField='first';
     raffleNote.style.visibility='hidden';
     raffleWarn.style.visibility='hidden';
-    updateNameDisplay(); updateContactDisplay(); updateActiveFieldStyles();
+    updateFirstNameDisplay(); updateLastNameDisplay(); updateContactDisplay(); updateActiveFieldStyles();
   }
-  function updateNameDisplay(){
-    if(currentName.length === 0){ nameDisplay.textContent='YOUR NAME'; nameDisplay.classList.add('placeholder'); }
-    else { nameDisplay.textContent = currentName; nameDisplay.classList.remove('placeholder'); }
+  function updateFirstNameDisplay(){
+    if(currentFirst.length === 0){ firstNameDisplay.textContent='FIRST NAME'; firstNameDisplay.classList.add('placeholder'); }
+    else { firstNameDisplay.textContent = currentFirst; firstNameDisplay.classList.remove('placeholder'); }
+  }
+  function updateLastNameDisplay(){
+    if(currentLast.length === 0){ lastNameDisplay.textContent='LAST NAME'; lastNameDisplay.classList.add('placeholder'); }
+    else { lastNameDisplay.textContent = currentLast; lastNameDisplay.classList.remove('placeholder'); }
   }
   function updateContactDisplay(){
     if(currentContact.length === 0){ contactDisplay.textContent='EMAIL OR PHONE'; contactDisplay.classList.add('placeholder'); }
     else { contactDisplay.textContent = currentContact; contactDisplay.classList.remove('placeholder'); }
   }
   function updateActiveFieldStyles(){
-    nameDisplay.classList.toggle('active-field', activeField==='name');
+    firstNameDisplay.classList.toggle('active-field', activeField==='first');
+    lastNameDisplay.classList.toggle('active-field', activeField==='last');
     contactDisplay.classList.toggle('active-field', activeField==='contact');
   }
-  nameDisplay.addEventListener('click', function(e){ e.stopPropagation(); activeField='name'; updateActiveFieldStyles(); });
+  firstNameDisplay.addEventListener('click', function(e){ e.stopPropagation(); activeField='first'; updateActiveFieldStyles(); });
+  lastNameDisplay.addEventListener('click', function(e){ e.stopPropagation(); activeField='last'; updateActiveFieldStyles(); });
   contactDisplay.addEventListener('click', function(e){ e.stopPropagation(); activeField='contact'; updateActiveFieldStyles(); });
 
   function typeChar(ch){
-    if(activeField === 'name'){
-      if(currentName.length < MAX_NAME_LEN){ currentName += ch; updateNameDisplay(); }
+    if(activeField === 'first'){
+      if(currentFirst.length < MAX_NAME_LEN){ currentFirst += ch; updateFirstNameDisplay(); }
+    } else if(activeField === 'last'){
+      if(currentLast.length < MAX_NAME_LEN){ currentLast += ch; updateLastNameDisplay(); }
     } else {
       if(currentContact.length < MAX_CONTACT_LEN){ currentContact += ch; updateContactDisplay(); }
     }
   }
   function backspace(){
-    if(activeField === 'name'){ currentName = currentName.slice(0,-1); updateNameDisplay(); }
+    if(activeField === 'first'){ currentFirst = currentFirst.slice(0,-1); updateFirstNameDisplay(); }
+    else if(activeField === 'last'){ currentLast = currentLast.slice(0,-1); updateLastNameDisplay(); }
     else { currentContact = currentContact.slice(0,-1); updateContactDisplay(); }
   }
 
@@ -519,8 +535,9 @@
 
   document.getElementById('btn-submit-name').addEventListener('click', function(e){
     e.stopPropagation();
-    var finalName = currentName.trim();
-    if(finalName.length === 0) finalName = 'RECRUIT';
+    var finalFirst = currentFirst.trim();
+    if(finalFirst.length === 0) finalFirst = 'RECRUIT';
+    var finalLast = currentLast.trim();
     var finalContact = currentContact.trim();
     if(finalContact.length === 0){
       raffleWarn.style.visibility = 'visible';
@@ -529,7 +546,7 @@
       return;
     }
     raffleWarn.style.visibility = 'hidden';
-    submitScore(finalName, finalContact, lastScore);
+    submitScore(finalFirst, finalLast, finalContact, lastScore);
   });
 
   // NOTE: GitHub Pages is static hosting -- there's no server to share data
@@ -541,9 +558,9 @@
   // Firebase/Supabase) -- ask if you want that built out instead.
   var LB_KEY = 'sarge-leaderboard-entries';
 
-  function submitScore(name, contact, score){
+  function submitScore(firstName, lastName, contact, score){
     raffleNote.style.visibility = 'visible';
-    saveEntry(name, contact, score);
+    saveEntry(firstName, lastName, contact, score);
     showLeaderboard();
   }
 
@@ -551,7 +568,7 @@
   // If the same person plays again, their entry is only updated when the
   // new score beats their previous best -- otherwise their existing entry
   // (and raffle eligibility) is left alone.
-  function saveEntry(name, contact, score){
+  function saveEntry(firstName, lastName, contact, score){
     try{
       var list = [];
       var existing = localStorage.getItem(LB_KEY);
@@ -561,9 +578,9 @@
       var idx = list.findIndex(function(e){ return (e.contact||'').trim().toLowerCase() === key; });
 
       if(idx === -1){
-        list.push({name:name, contact:contact, score:score, ts:Date.now()});
+        list.push({firstName:firstName, lastName:lastName, contact:contact, score:score, ts:Date.now()});
       } else if(score > list[idx].score){
-        list[idx] = {name:name, contact:contact, score:score, ts:Date.now()};
+        list[idx] = {firstName:firstName, lastName:lastName, contact:contact, score:score, ts:Date.now()};
       }
       list.sort(function(a,b){ return b.score - a.score; });
       localStorage.setItem(LB_KEY, JSON.stringify(list));
@@ -587,8 +604,8 @@
         var row = document.createElement('div');
         row.className = 'board-row';
         var rankHtml = i < 3 ? medals[i] : (i+1);
-        var firstName = (entry.name || 'RECRUIT').trim().split(/\s+/)[0];
-        row.innerHTML = '<span class="rank">'+rankHtml+'</span><span class="name">'+escapeHtml(firstName)+'</span><span class="score">'+entry.score+'</span>';
+        var displayName = (entry.firstName || 'RECRUIT').trim();
+        row.innerHTML = '<span class="rank">'+rankHtml+'</span><span class="name">'+escapeHtml(displayName)+'</span><span class="score">'+entry.score+'</span>';
         board.appendChild(row);
       });
     }
