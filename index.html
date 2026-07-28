@@ -65,6 +65,7 @@
   #stage{position:relative; background:#000;}
   #stage img.bg{position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:fill;}
   .item-hit{position:absolute; cursor:pointer; transition:opacity .2s ease;}
+  .item-hit.item-decor{cursor:default;}
   .item-hit img{width:100%; height:100%; display:block; pointer-events:none;}
   .item-hit.found{opacity:0; pointer-events:none;}
 
@@ -84,8 +85,11 @@
   #screen-complete .result-card{background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:12px; padding:24px 36px; margin-bottom:16px; min-width:320px;}
   #screen-complete .result-line{font-size:19px; margin:5px 0; color:var(--khaki);}
   #screen-complete .result-score{font-family:var(--font-mono); font-size:44px; color:var(--caution);}
-  .dogtag{width:340px; padding:16px 24px; margin:12px auto 6px; background:var(--steel); color:var(--ink); border-radius:22px; font-family:var(--font-mono); font-size:24px; letter-spacing:.15em; text-align:center; min-height:32px; box-shadow:inset 0 2px 4px rgba(0,0,0,.3);}
+  .dogtag{width:340px; padding:16px 24px; margin:8px auto; background:var(--steel); color:var(--ink); border-radius:22px; font-family:var(--font-mono); font-size:24px; letter-spacing:.15em; text-align:center; min-height:32px; box-shadow:inset 0 2px 4px rgba(0,0,0,.3); border:3px solid transparent; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .dogtag.placeholder{color:var(--steel-dark);}
+  .dogtag.active-field{border-color:var(--caution);}
+  #contact-display{font-size:18px; width:min(92vw,420px); letter-spacing:.05em;}
+  .raffle-warn{font-family:var(--font-mono); font-size:13px; color:#ffb199; letter-spacing:.05em; margin-top:10px; max-width:420px;}
   .keyboard{display:grid; grid-template-columns:repeat(10,1fr); gap:12px; max-width:620px; width:92vw; margin:20px auto;}
   .key{background:var(--ground-dark); border:2px solid var(--steel-dark); color:var(--khaki); font-family:var(--font-body); font-weight:600; font-size:20px; border-radius:8px; padding:16px 0; text-transform:uppercase; line-height:1;}
   .key:active{background:var(--steel-dark);}
@@ -96,12 +100,13 @@
   .board{width:min(90vw,600px); background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:10px; margin:16px 0 22px; overflow:hidden; max-height:50vh; overflow-y:auto;}
   .board-row{display:flex; align-items:center; gap:14px; padding:10px 20px; border-bottom:1px solid #333c28; font-family:var(--font-body); font-size:17px;}
   .board-row:last-child{border-bottom:none;}
-  .board-row .rank{font-family:var(--font-mono); color:var(--caution); width:30px;}
+  .board-row .rank{font-family:var(--font-mono); color:var(--caution); width:34px; font-size:19px;}
   .board-row .name{flex:1; text-align:left; text-transform:uppercase; letter-spacing:.05em;}
   .board-row .score{font-family:var(--font-mono); color:var(--khaki);}
   .board-empty{padding:24px; color:var(--steel);}
 
   .staff-reset{position:absolute; top:10px; right:10px; width:32px; height:32px; border-radius:50%; background:var(--ground-dark); border:1px solid var(--steel-dark); color:var(--steel); font-size:15px; opacity:.35; z-index:50;}
+  .staff-export{position:absolute; top:10px; right:52px; width:32px; height:32px; border-radius:50%; background:var(--ground-dark); border:1px solid var(--steel-dark); color:var(--steel); font-size:14px; opacity:.35; z-index:50;}
 </style>
 </head>
 <body>
@@ -156,10 +161,12 @@
       <div class="result-score" id="result-score">1240</div>
     </div>
     <div class="eyebrow">Stamp your dog tag to enter</div>
-    <div class="dogtag placeholder" id="name-display">YOUR NAME</div>
+    <div class="dogtag placeholder active-field" id="name-display">YOUR NAME</div>
+    <div class="dogtag placeholder" id="contact-display">EMAIL OR PHONE</div>
     <div class="keyboard" id="keyboard"></div>
     <button class="big-btn" id="btn-submit-name" style="margin-top:6px;">LOCK IT IN</button>
     <div class="raffle-note" id="raffle-note" style="visibility:hidden;">&#10003; ENTERED IN THE PRIZE RAFFLE &mdash; CHECK THE LEADERBOARD</div>
+    <div class="raffle-warn" id="raffle-warn" style="visibility:hidden;">Enter an email or phone number to be entered in the raffle</div>
   </div>
 
   <div class="screen" id="screen-leaderboard">
@@ -169,6 +176,7 @@
     <button class="ghost-btn" id="btn-play-again">PLAY AGAIN</button>
   </div>
 
+  <button class="staff-export" id="staff-export" title="Export raffle entries (CSV)">&#8595;</button>
   <button class="staff-reset" id="staff-reset" title="Staff reset">&#8635;</button>
 </div>
 
@@ -216,6 +224,38 @@
   document.getElementById('btn-view-leaderboard').addEventListener('click', function(e){ e.stopPropagation(); showLeaderboard(); });
   document.getElementById('btn-start-hunt').addEventListener('click', function(e){ e.stopPropagation(); startGame(); });
   document.getElementById('staff-reset').addEventListener('click', function(e){ e.stopPropagation(); resetToAttract(); });
+  document.getElementById('staff-export').addEventListener('click', function(e){ e.stopPropagation(); exportEntriesCSV(); });
+
+  function exportEntriesCSV(){
+    var list = [];
+    try{
+      var existing = localStorage.getItem('sarge-leaderboard-entries');
+      if(existing) list = JSON.parse(existing);
+    }catch(err){ list = []; }
+
+    function csvEscape(val){
+      var s = String(val==null ? '' : val);
+      if(/[",\n]/.test(s)) s = '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }
+
+    var rows = [['Name','Contact','Score','Entered At']];
+    list.forEach(function(e){
+      rows.push([e.name, e.contact||'', e.score, new Date(e.ts).toLocaleString()]);
+    });
+    var csv = rows.map(function(r){ return r.map(csvEscape).join(','); }).join('\n');
+
+    var blob = new Blob([csv], {type:'text/csv'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.download = 'sarge-raffle-entries-' + stamp + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   var stageWrap = document.getElementById('stage-wrap');
   var stage = document.getElementById('stage');
@@ -248,13 +288,17 @@
     bgImg.src = BG;
     stage.appendChild(bgImg);
 
+    var chosenIds = {};
     var chosen = shuffle(ITEM_POOL).slice(0, ROUND_SIZE);
+    chosen.forEach(function(def){ chosenIds[def.id] = true; });
     activeItems = chosen.map(function(def){ return {def:def, found:false, el:null}; });
 
-    activeItems.forEach(function(itemObj){
-      var d = itemObj.def;
+    // render every item in the pool so the full scene always looks the same,
+    // but only the ones chosen for this round get a click handler
+    ITEM_POOL.forEach(function(d){
+      var isTarget = !!chosenIds[d.id];
       var g = document.createElement('div');
-      g.className = 'item-hit';
+      g.className = isTarget ? 'item-hit' : 'item-hit item-decor';
       g.style.left = d.x + '%';
       g.style.top = d.y + '%';
       g.style.width = d.w + '%';
@@ -263,9 +307,13 @@
       img.src = d.sprite;
       g.appendChild(img);
       stage.appendChild(g);
-      itemObj.el = g;
-      g.addEventListener('click', function(){ handleFind(itemObj); });
-      g.addEventListener('touchstart', function(ev){ ev.preventDefault(); handleFind(itemObj); }, {passive:false});
+
+      if(isTarget){
+        var itemObj = activeItems.filter(function(a){ return a.def.id === d.id; })[0];
+        itemObj.el = g;
+        g.addEventListener('click', function(){ handleFind(itemObj); });
+        g.addEventListener('touchstart', function(ev){ ev.preventDefault(); handleFind(itemObj); }, {passive:false});
+      }
     });
 
     buildKeyList();
@@ -369,41 +417,75 @@
   }
 
   var currentName = '';
-  var MAX_NAME_LEN = 12;
+  var currentContact = '';
+  var activeField = 'name';
+  var MAX_NAME_LEN = 16;
+  var MAX_CONTACT_LEN = 40;
   var nameDisplay = document.getElementById('name-display');
+  var contactDisplay = document.getElementById('contact-display');
   var raffleNote = document.getElementById('raffle-note');
+  var raffleWarn = document.getElementById('raffle-warn');
 
-  function resetNameEntry(){ currentName=''; raffleNote.style.visibility='hidden'; updateNameDisplay(); }
+  function resetNameEntry(){
+    currentName=''; currentContact=''; activeField='name';
+    raffleNote.style.visibility='hidden';
+    raffleWarn.style.visibility='hidden';
+    updateNameDisplay(); updateContactDisplay(); updateActiveFieldStyles();
+  }
   function updateNameDisplay(){
     if(currentName.length === 0){ nameDisplay.textContent='YOUR NAME'; nameDisplay.classList.add('placeholder'); }
     else { nameDisplay.textContent = currentName; nameDisplay.classList.remove('placeholder'); }
   }
+  function updateContactDisplay(){
+    if(currentContact.length === 0){ contactDisplay.textContent='EMAIL OR PHONE'; contactDisplay.classList.add('placeholder'); }
+    else { contactDisplay.textContent = currentContact; contactDisplay.classList.remove('placeholder'); }
+  }
+  function updateActiveFieldStyles(){
+    nameDisplay.classList.toggle('active-field', activeField==='name');
+    contactDisplay.classList.toggle('active-field', activeField==='contact');
+  }
+  nameDisplay.addEventListener('click', function(e){ e.stopPropagation(); activeField='name'; updateActiveFieldStyles(); });
+  contactDisplay.addEventListener('click', function(e){ e.stopPropagation(); activeField='contact'; updateActiveFieldStyles(); });
+
+  function typeChar(ch){
+    if(activeField === 'name'){
+      if(currentName.length < MAX_NAME_LEN){ currentName += ch; updateNameDisplay(); }
+    } else {
+      if(currentContact.length < MAX_CONTACT_LEN){ currentContact += ch; updateContactDisplay(); }
+    }
+  }
+  function backspace(){
+    if(activeField === 'name'){ currentName = currentName.slice(0,-1); updateNameDisplay(); }
+    else { currentContact = currentContact.slice(0,-1); updateContactDisplay(); }
+  }
 
   function buildKeyboard(){
-    var rows = ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];
+    var rows = ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM','1234567890'];
     var kb = document.getElementById('keyboard');
     kb.innerHTML = '';
     rows.forEach(function(row){
       row.split('').forEach(function(ch){
         var b = document.createElement('button');
         b.className = 'key'; b.textContent = ch;
-        b.addEventListener('click', function(e){
-          e.stopPropagation();
-          if(currentName.length < MAX_NAME_LEN){ currentName += ch; updateNameDisplay(); }
-        });
+        b.addEventListener('click', function(e){ e.stopPropagation(); typeChar(ch); });
         kb.appendChild(b);
       });
     });
-    var space = document.createElement('button');
-    space.className = 'key wide'; space.textContent = 'SPACE';
-    space.addEventListener('click', function(e){
-      e.stopPropagation();
-      if(currentName.length < MAX_NAME_LEN && currentName.length>0){ currentName += ' '; updateNameDisplay(); }
+    // symbol/utility row: @ . - SPACE DELETE, spans sum to 10 columns
+    var symbolRow = [
+      {label:'@', span:2, action:function(){ typeChar('@'); }},
+      {label:'.', span:2, action:function(){ typeChar('.'); }},
+      {label:'SPACE', span:3, action:function(){ typeChar(' '); }},
+      {label:'DELETE', span:3, action:function(){ backspace(); }}
+    ];
+    symbolRow.forEach(function(k){
+      var b = document.createElement('button');
+      b.className = 'key' + (k.span>1 ? ' wide' : '');
+      if(k.span>1) b.style.gridColumn = 'span ' + k.span;
+      b.textContent = k.label;
+      b.addEventListener('click', function(e){ e.stopPropagation(); k.action(); });
+      kb.appendChild(b);
     });
-    var back = document.createElement('button');
-    back.className = 'key wide'; back.textContent = 'DELETE';
-    back.addEventListener('click', function(e){ e.stopPropagation(); currentName = currentName.slice(0,-1); updateNameDisplay(); });
-    kb.appendChild(space); kb.appendChild(back);
   }
   buildKeyboard();
 
@@ -411,32 +493,51 @@
     e.stopPropagation();
     var finalName = currentName.trim();
     if(finalName.length === 0) finalName = 'RECRUIT';
-    submitScore(finalName, lastScore);
+    var finalContact = currentContact.trim();
+    if(finalContact.length === 0){
+      raffleWarn.style.visibility = 'visible';
+      activeField = 'contact';
+      updateActiveFieldStyles();
+      return;
+    }
+    raffleWarn.style.visibility = 'hidden';
+    submitScore(finalName, finalContact, lastScore);
   });
 
   // NOTE: GitHub Pages is static hosting -- there's no server to share data
-  // across devices, so the leaderboard is saved with localStorage. That means
-  // it persists reliably on ONE browser/device (exactly what you want for a
+  // across devices, so entries are saved with localStorage. That means they
+  // persist reliably on ONE browser/device (exactly what you want for a
   // single touchscreen kiosk running all conference), but a second kiosk or
-  // laptop would have its own separate leaderboard. If you ever need one
-  // shared leaderboard across multiple screens, that requires a small backend
-  // (e.g. Firebase/Supabase) -- ask if you want that built out instead.
+  // laptop would have its own separate list. If you ever need one shared
+  // list across multiple screens, that requires a small backend (e.g.
+  // Firebase/Supabase) -- ask if you want that built out instead.
   var LB_KEY = 'sarge-leaderboard-entries';
 
-  function submitScore(name, score){
+  function submitScore(name, contact, score){
     raffleNote.style.visibility = 'visible';
-    saveEntry(name, score);
+    saveEntry(name, contact, score);
     showLeaderboard();
   }
 
-  function saveEntry(name, score){
+  // One raffle entry per person: entries are de-duplicated by contact info.
+  // If the same person plays again, their entry is only updated when the
+  // new score beats their previous best -- otherwise their existing entry
+  // (and raffle eligibility) is left alone.
+  function saveEntry(name, contact, score){
     try{
       var list = [];
       var existing = localStorage.getItem(LB_KEY);
       if(existing){ list = JSON.parse(existing); }
-      list.push({name:name, score:score, ts:Date.now()});
+
+      var key = contact.trim().toLowerCase();
+      var idx = list.findIndex(function(e){ return (e.contact||'').trim().toLowerCase() === key; });
+
+      if(idx === -1){
+        list.push({name:name, contact:contact, score:score, ts:Date.now()});
+      } else if(score > list[idx].score){
+        list[idx] = {name:name, contact:contact, score:score, ts:Date.now()};
+      }
       list.sort(function(a,b){ return b.score - a.score; });
-      list = list.slice(0, 25);
       localStorage.setItem(LB_KEY, JSON.stringify(list));
     }catch(e){ console.error('Storage error', e); }
   }
@@ -453,15 +554,18 @@
     if(list.length === 0){
       board.innerHTML = '<div class="board-empty">No recruits on the board yet &mdash; be the first.</div>';
     } else {
-      list.slice(0,10).forEach(function(entry, i){
+      var medals = ['&#129351;','&#129352;','&#129353;']; // gold/silver/bronze
+      list.forEach(function(entry, i){
         var row = document.createElement('div');
         row.className = 'board-row';
-        row.innerHTML = '<span class="rank">'+(i+1)+'</span><span class="name">'+escapeHtml(entry.name)+'</span><span class="score">'+entry.score+'</span>';
+        var rankHtml = i < 3 ? medals[i] : (i+1);
+        var firstName = (entry.name || 'RECRUIT').trim().split(/\s+/)[0];
+        row.innerHTML = '<span class="rank">'+rankHtml+'</span><span class="name">'+escapeHtml(firstName)+'</span><span class="score">'+entry.score+'</span>';
         board.appendChild(row);
       });
     }
     show('leaderboard');
-    armIdleReset(20);
+    armIdleReset(60);
   }
 
   function escapeHtml(str){ var d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
@@ -469,7 +573,7 @@
   document.getElementById('btn-play-again').addEventListener('click', function(e){ e.stopPropagation(); resetToAttract(); });
 
   ['screen-complete','screen-leaderboard'].forEach(function(id){
-    document.getElementById(id).addEventListener('click', function(){ armIdleReset(id==='screen-complete'?45:20); });
+    document.getElementById(id).addEventListener('click', function(){ armIdleReset(id==='screen-complete'?45:60); });
   });
 
 })();
