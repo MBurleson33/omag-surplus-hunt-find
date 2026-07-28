@@ -105,8 +105,8 @@
   .board-row .score{font-family:var(--font-mono); color:var(--khaki);}
   .board-empty{padding:24px; color:var(--steel);}
 
-  .staff-reset{position:absolute; top:10px; right:10px; width:32px; height:32px; border-radius:50%; background:var(--ground-dark); border:1px solid var(--steel-dark); color:var(--steel); font-size:15px; opacity:.35; z-index:50;}
-  .staff-export{position:absolute; top:10px; right:52px; width:32px; height:32px; border-radius:50%; background:var(--ground-dark); border:1px solid var(--steel-dark); color:var(--steel); font-size:14px; opacity:.35; z-index:50;}
+  .staff-reset{position:absolute; bottom:10px; right:10px; width:32px; height:32px; border-radius:50%; background:var(--ground-dark); border:1px solid var(--steel-dark); color:var(--steel); font-size:15px; opacity:.35; z-index:50;}
+  .export-link{margin-top:16px; font-family:var(--font-mono); font-size:12px; letter-spacing:.1em; color:var(--steel); background:transparent; border:1px solid var(--steel-dark); border-radius:6px; padding:8px 16px; text-transform:uppercase; opacity:.6;}
 </style>
 </head>
 <body>
@@ -174,9 +174,9 @@
     <h1 class="stencil-title" data-text="LEADERBOARD">LEADERBOARD</h1>
     <div class="board" id="board"></div>
     <button class="ghost-btn" id="btn-play-again">PLAY AGAIN</button>
+    <button class="export-link" id="staff-export" title="Export raffle entries (CSV)">&#8595; EXPORT ENTRIES (STAFF)</button>
   </div>
 
-  <button class="staff-export" id="staff-export" title="Export raffle entries (CSV)">&#8595;</button>
   <button class="staff-reset" id="staff-reset" title="Staff reset">&#8635;</button>
 </div>
 
@@ -205,6 +205,24 @@
   ];
   var BG = 'assets/background.jpg';
   var ROUND_SIZE = 6; // items shown per round, chosen randomly from the pool above
+
+  // Preload the background + every item sprite/icon right away (while the
+  // attract/instructions screens are showing) so that by the time a round
+  // actually builds, everything is already in the browser cache. Combined
+  // with the stage staying hidden until the background finishes loading
+  // (see buildRound below), this prevents item art from ever flashing on
+  // screen before the background is visible.
+  var preloadedImgs = [];
+  function preloadAssets(){
+    var urls = [BG];
+    ITEM_POOL.forEach(function(d){ urls.push(d.sprite, d.icon); });
+    urls.forEach(function(u){
+      var img = new Image();
+      img.src = u;
+      preloadedImgs.push(img);
+    });
+  }
+  preloadAssets();
 
   var screens = {
     attract: document.getElementById('screen-attract'),
@@ -283,9 +301,10 @@
 
   function buildRound(){
     stage.innerHTML = '';
+    stage.style.visibility = 'hidden';
+
     var bgImg = document.createElement('img');
     bgImg.className = 'bg';
-    bgImg.src = BG;
     stage.appendChild(bgImg);
 
     var chosenIds = {};
@@ -318,6 +337,15 @@
 
     buildKeyList();
     sizeStage();
+
+    // reveal only once the background is actually painted -- this is the
+    // guard that stops item art from ever appearing before the background.
+    // Listener is attached before src is set, so this is race-safe even
+    // when the image is already fully cached from preloadAssets().
+    function reveal(){ stage.style.visibility = 'visible'; }
+    bgImg.addEventListener('load', reveal);
+    bgImg.addEventListener('error', reveal);
+    bgImg.src = BG;
   }
 
   function buildKeyList(){
