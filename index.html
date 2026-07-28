@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sarge's Surplus Hunt</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600;700&display=swap');
+
+  :root{
+    --ink:#21261c; --ground-dark:#2c3524;
+    --rust:#b8502c; --rust-dark:#8f3d22;
+    --caution:#d9a62e; --khaki:#efe8d2;
+    --steel:#8a9186; --steel-dark:#5f665c;
+    --danger:#7a2419;
+    --font-display:'Anton','Arial Black',sans-serif;
+    --font-body:'Oswald','Arial Narrow',sans-serif;
+    --font-mono:ui-monospace,'Courier New',monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;}
+  body{font-family:var(--font-body); color:var(--khaki);}
+
+  .app{position:relative; width:100vw; height:100vh; overflow:hidden; background:var(--ink);}
+
+  .screen{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .35s ease; text-align:center;}
+  .screen.active{opacity:1; pointer-events:auto;}
+
+  .stencil-title{position:relative; font-family:var(--font-display); text-transform:uppercase; letter-spacing:.04em; line-height:.95; color:var(--khaki); margin:0;}
+  .stencil-title::before{content:attr(data-text); position:absolute; left:.06em; top:.08em; color:var(--rust-dark); z-index:-1;}
+
+  .tape-divider{width:min(60vw,520px); height:14px; margin:18px auto;
+    background:repeating-linear-gradient(45deg, var(--caution) 0 14px, var(--ink) 14px 28px);
+    clip-path:polygon(0 20%,100% 0,100% 80%,0 100%); opacity:.9;}
+
+  .eyebrow{font-family:var(--font-mono); letter-spacing:.3em; text-transform:uppercase; color:var(--caution); font-size:14px; font-weight:700;}
+  button{font-family:var(--font-body); cursor:pointer; border:none;}
+  .big-btn{font-family:var(--font-display); font-size:28px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink); background:var(--caution);
+    padding:20px 48px; border-radius:6px; box-shadow:0 6px 0 var(--rust-dark); transition:transform .08s ease;}
+  .big-btn:active{transform:translateY(6px); box-shadow:0 0 0 var(--rust-dark);}
+  .ghost-btn{font-family:var(--font-body); font-weight:600; font-size:16px; color:var(--khaki); background:transparent; border:2px solid var(--steel);
+    padding:10px 22px; border-radius:6px; letter-spacing:.08em; text-transform:uppercase;}
+
+  #screen-attract{background:radial-gradient(ellipse at center, #3a4530 0%, var(--ink) 75%);}
+  #screen-attract .stencil-title{font-size:min(10vw,96px);}
+  #screen-attract .sub{font-size:20px; max-width:640px; margin:0 auto 10px; color:var(--steel);}
+  #screen-attract .tap-hint{margin-top:36px; font-family:var(--font-mono); font-size:16px; color:var(--caution); letter-spacing:.15em; animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:.4;}50%{opacity:1;}}
+
+  #screen-instructions .stencil-title{font-size:48px;}
+  #screen-instructions .briefing{max-width:680px; font-size:19px; line-height:1.5; color:var(--khaki); background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:10px; padding:24px 30px; margin:10px 0 26px;}
+  #screen-instructions .briefing b{color:var(--caution);}
+
+  #screen-game{justify-content:flex-start; flex-direction:row; align-items:stretch;}
+  .game-main{flex:1; display:flex; flex-direction:column; height:100%;}
+  .hud{width:100%; display:flex; align-items:center; justify-content:space-between; padding:14px 22px; gap:16px; z-index:5;}
+  .hud-block{background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:8px; padding:6px 16px; font-family:var(--font-mono); font-size:20px; min-width:120px;}
+  .hud-label{display:block; font-family:var(--font-body); font-size:10px; letter-spacing:.2em; color:var(--steel); text-transform:uppercase;}
+  #timer-block.warning{border-color:var(--danger); color:#ffb199; animation:pulse .8s ease-in-out infinite;}
+  .timerbar-wrap{flex:1; height:14px; background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:8px; overflow:hidden; max-width:360px;}
+  #timerbar{height:100%; width:100%; background:var(--caution); transition:width 1s linear, background .3s;}
+
+  .stage-wrap{flex:1; position:relative; display:flex; align-items:center; justify-content:center; background:#000;}
+  #stage{position:relative; background:#000;}
+  #stage img.bg{position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:fill;}
+  .item-hit{position:absolute; cursor:pointer; transition:opacity .3s ease, transform .3s ease;}
+  .item-hit img{width:100%; height:100%; display:block; pointer-events:none;}
+  .item-hit.found{opacity:0.15; transform:scale(0.9); pointer-events:none;}
+  .item-hit .ring{position:absolute; inset:-8%; border:3px solid var(--caution); border-radius:14px; opacity:0;}
+  .item-hit.pulse-ring .ring{animation:ringPulse 1.4s ease-out infinite;}
+  @keyframes ringPulse{0%{opacity:.55; transform:scale(0.96);}100%{opacity:0; transform:scale(1.12);}}
+
+  .popup{position:absolute; font-family:var(--font-display); font-size:24px; color:var(--caution); pointer-events:none; animation:floatUp 1s ease-out forwards; z-index:20;}
+  @keyframes floatUp{0%{opacity:1; transform:translateY(0);}100%{opacity:0; transform:translateY(-50px);}}
+
+  .key-panel{width:220px; flex-shrink:0; background:var(--ground-dark); border-left:3px solid var(--steel-dark); padding:14px 12px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;}
+  .key-panel .key-title{font-family:var(--font-mono); font-size:11px; letter-spacing:.2em; color:var(--caution); text-transform:uppercase; text-align:center; margin-bottom:4px;}
+  .key-item{display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.15); border:1px solid var(--steel-dark); border-radius:8px; padding:6px 8px; transition:opacity .3s ease;}
+  .key-item img{width:40px; height:40px; object-fit:contain; flex-shrink:0;}
+  .key-item .kl{font-size:13px; text-transform:uppercase; letter-spacing:.03em; text-align:left; line-height:1.15; flex:1;}
+  .key-item.found{opacity:0.35;}
+  .key-item.found .kl{text-decoration:line-through;}
+  .key-check{width:18px; height:18px; border-radius:50%; border:2px solid var(--steel); flex-shrink:0;}
+  .key-item.found .key-check{background:var(--caution); border-color:var(--caution);}
+
+  #screen-complete .result-card{background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:12px; padding:24px 36px; margin-bottom:16px; min-width:320px;}
+  #screen-complete .result-line{font-size:19px; margin:5px 0; color:var(--khaki);}
+  #screen-complete .result-score{font-family:var(--font-mono); font-size:44px; color:var(--caution);}
+  .dogtag{width:340px; padding:16px 24px; margin:12px auto 6px; background:var(--steel); color:var(--ink); border-radius:22px; font-family:var(--font-mono); font-size:24px; letter-spacing:.15em; text-align:center; min-height:32px; box-shadow:inset 0 2px 4px rgba(0,0,0,.3);}
+  .dogtag.placeholder{color:var(--steel-dark);}
+  .keyboard{display:grid; grid-template-columns:repeat(10,1fr); gap:7px; max-width:540px; margin:16px auto;}
+  .key{background:var(--ground-dark); border:2px solid var(--steel-dark); color:var(--khaki); font-family:var(--font-body); font-weight:600; font-size:19px; border-radius:6px; padding:11px 0; text-transform:uppercase;}
+  .key:active{background:var(--steel-dark);}
+  .key.wide{grid-column:span 5;}
+  .raffle-note{font-family:var(--font-mono); font-size:13px; color:var(--caution); letter-spacing:.1em; margin-top:12px; max-width:420px;}
+
+  #screen-leaderboard .stencil-title{font-size:42px;}
+  .board{width:min(90vw,600px); background:var(--ground-dark); border:2px solid var(--steel-dark); border-radius:10px; margin:16px 0 22px; overflow:hidden; max-height:50vh; overflow-y:auto;}
+  .board-row{display:flex; align-items:center; gap:14px; padding:10px 20px; border-bottom:1px solid #333c28; font-family:var(--font-body); font-size:17px;}
+  .board-row:last-child{border-bottom:none;}
+  .board-row .rank{font-family:var(--font-mono); color:var(--caution); width:30px;}
+  .board-row .name{flex:1; text-align:left; text-transform:uppercase; letter-spacing:.05em;}
+  .board-row .score{font-family:var(--font-mono); color:var(--khaki);}
+  .board-empty{padding:24px; color:var(--steel);}
+
+  .staff-reset{position:absolute; top:10px; right:10px; width:32px; height:32px; border-radius:50%; background:var(--ground-dark); border:1px solid var(--steel-dark); color:var(--steel); font-size:15px; opacity:.35; z-index:50;}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="screen active" id="screen-attract">
+    <div class="eyebrow">OML Conference &middot; IT Surplus Program</div>
+    <h1 class="stencil-title" data-text="SARGE'S SURPLUS HUNT">SARGE'S SURPLUS HUNT</h1>
+    <div class="tape-divider"></div>
+    <p class="sub">Sarge's yard is full of gear that doesn't belong. Find every item on your list before time's up to enter the raffle.</p>
+    <div class="tap-hint">TAP ANYWHERE TO REPORT FOR DUTY</div>
+  </div>
+
+  <div class="screen" id="screen-instructions">
+    <div class="eyebrow">Briefing</div>
+    <h1 class="stencil-title" data-text="LISTEN UP">LISTEN UP</h1>
+    <div class="briefing">
+      Check your <b>list</b> on the side of the screen &mdash; that's what you're hunting for.<br>
+      Tap each item once you spot it hiding in the yard.<br>
+      You've got <b>60 seconds</b>. Time left when you finish adds a bonus.<br>
+      Finish the hunt and you're entered in the <b>raffle</b> &mdash; plus a shot at the leaderboard.
+    </div>
+    <button class="big-btn" id="btn-start-hunt">START THE CLOCK</button>
+  </div>
+
+  <div class="screen" id="screen-game">
+    <div class="game-main">
+      <div class="hud">
+        <div class="hud-block" id="found-block"><span class="hud-label">Recovered</span><span id="found-count">0/8</span></div>
+        <div class="timerbar-wrap"><div id="timerbar"></div></div>
+        <div class="hud-block" id="timer-block"><span class="hud-label">Time</span><span id="timer-count">60</span></div>
+      </div>
+      <div class="stage-wrap" id="stage-wrap">
+        <div id="stage"></div>
+      </div>
+    </div>
+    <div class="key-panel" id="key-panel">
+      <div class="key-title">Find These</div>
+      <div id="key-list"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-complete">
+    <div class="eyebrow" id="complete-eyebrow">Mission Report</div>
+    <h1 class="stencil-title" data-text="YARD CLEARED">YARD CLEARED</h1>
+    <div class="result-card">
+      <div class="result-line" id="result-found">Recovered: 8/8</div>
+      <div class="result-line" id="result-time">Time remaining: 12s</div>
+      <div class="result-score" id="result-score">1240</div>
+    </div>
+    <div class="eyebrow">Stamp your dog tag to enter</div>
+    <div class="dogtag placeholder" id="name-display">YOUR NAME</div>
+    <div class="keyboard" id="keyboard"></div>
+    <button class="big-btn" id="btn-submit-name" style="margin-top:6px;">LOCK IT IN</button>
+    <div class="raffle-note" id="raffle-note" style="visibility:hidden;">&#10003; ENTERED IN THE PRIZE RAFFLE &mdash; CHECK THE LEADERBOARD</div>
+  </div>
+
+  <div class="screen" id="screen-leaderboard">
+    <div class="eyebrow">Top Recruits</div>
+    <h1 class="stencil-title" data-text="LEADERBOARD">LEADERBOARD</h1>
+    <div class="board" id="board"></div>
+    <button class="ghost-btn" id="btn-play-again">PLAY AGAIN</button>
+  </div>
+
+  <button class="staff-reset" id="staff-reset" title="Staff reset">&#8635;</button>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- Hunt item pool: positions were auto-derived from your transparent
+  // 1920x1080 layers. x/y/w/h are percentages of the 1920x1080 canvas so
+  // everything stays aligned at any screen size. Add/remove entries here
+  // to change what's in the pool -- just make sure the image files exist
+  // under assets/items and assets/keys.
+  var ITEM_POOL = [
+    {"id":"flag","label":"American Flag","x":37.3958,"y":0.5556,"w":6.4062,"h":18.0556,"sprite":"assets/items/flag.png","icon":"assets/keys/flag.png"},
+    {"id":"armyman","label":"Army Man","x":82.4479,"y":74.8148,"w":5.7292,"h":16.3889,"sprite":"assets/items/armyman.png","icon":"assets/keys/armyman.png"},
+    {"id":"mannequin","label":"Army Mannequin","x":13.5417,"y":46.4815,"w":5.8333,"h":14.7222,"sprite":"assets/items/mannequin.png","icon":"assets/keys/mannequin.png"},
+    {"id":"computer","label":"Old Computer","x":67.2917,"y":48.6111,"w":15.2083,"h":19.9074,"sprite":"assets/items/computer.png","icon":"assets/keys/computer.png"},
+    {"id":"floppy","label":"Floppy Disk","x":58.3854,"y":84.0741,"w":8.9062,"h":10.1852,"sprite":"assets/items/floppy.png","icon":"assets/keys/floppy.png"},
+    {"id":"gnome","label":"Garden Gnome","x":11.0417,"y":80.3704,"w":4.5833,"h":13.9815,"sprite":"assets/items/gnome.png","icon":"assets/keys/gnome.png"},
+    {"id":"guardstand","label":"Guard Stand","x":49.7396,"y":14.6296,"w":6.1458,"h":14.0741,"sprite":"assets/items/guardstand.png","icon":"assets/keys/guardstand.png"},
+    {"id":"radsign","label":"Radiation Sign","x":40.3646,"y":30.3704,"w":3.6979,"h":6.5741,"sprite":"assets/items/radsign.png","icon":"assets/keys/radsign.png"},
+    {"id":"rope","label":"Coil of Rope","x":23.8542,"y":88.9815,"w":9.1146,"h":9.0741,"sprite":"assets/items/rope.png","icon":"assets/keys/rope.png"},
+    {"id":"duck","label":"Rubber Duck","x":80.0,"y":87.037,"w":5.4688,"h":9.7222,"sprite":"assets/items/duck.png","icon":"assets/keys/duck.png"},
+    {"id":"target","label":"Shooting Target","x":2.7083,"y":26.3889,"w":4.6875,"h":10.3704,"sprite":"assets/items/target.png","icon":"assets/keys/target.png"},
+    {"id":"omaglogo","label":"OMAG Logo","x":61.6667,"y":27.6852,"w":5.0,"h":4.537,"sprite":"assets/items/omaglogo.png","icon":"assets/keys/omaglogo.png"}
+  ];
+  var BG = 'assets/background.jpg';
+  var ROUND_SIZE = 8; // items shown per round, chosen randomly from the pool above
+
+  var screens = {
+    attract: document.getElementById('screen-attract'),
+    instructions: document.getElementById('screen-instructions'),
+    game: document.getElementById('screen-game'),
+    complete: document.getElementById('screen-complete'),
+    leaderboard: document.getElementById('screen-leaderboard')
+  };
+  function show(name){ Object.keys(screens).forEach(function(k){ screens[k].classList.toggle('active', k===name); }); }
+
+  var idleTimer = null;
+  function armIdleReset(seconds){ clearTimeout(idleTimer); idleTimer = setTimeout(resetToAttract, seconds*1000); }
+  function clearIdle(){ clearTimeout(idleTimer); }
+  function resetToAttract(){ clearIdle(); stopGameTimers(); show('attract'); }
+
+  document.getElementById('screen-attract').addEventListener('click', function(){ show('instructions'); });
+  document.getElementById('btn-start-hunt').addEventListener('click', function(e){ e.stopPropagation(); startGame(); });
+  document.getElementById('staff-reset').addEventListener('click', function(e){ e.stopPropagation(); resetToAttract(); });
+
+  var stageWrap = document.getElementById('stage-wrap');
+  var stage = document.getElementById('stage');
+  function sizeStage(){
+    var maxW = stageWrap.clientWidth, maxH = stageWrap.clientHeight;
+    var targetRatio = 16/9;
+    var w = maxW, h = w/targetRatio;
+    if(h > maxH){ h = maxH; w = h*targetRatio; }
+    stage.style.width = w+'px';
+    stage.style.height = h+'px';
+  }
+  window.addEventListener('resize', sizeStage);
+
+  function shuffle(arr){
+    var a = arr.slice();
+    for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; }
+    return a;
+  }
+
+  var activeItems = [];
+  var foundCount = 0;
+  var timeLeft = 60;
+  var timerInterval = null;
+  var TOTAL_TIME = 60;
+
+  function buildRound(){
+    stage.innerHTML = '';
+    var bgImg = document.createElement('img');
+    bgImg.className = 'bg';
+    bgImg.src = BG;
+    stage.appendChild(bgImg);
+
+    var chosen = shuffle(ITEM_POOL).slice(0, ROUND_SIZE);
+    activeItems = chosen.map(function(def){ return {def:def, found:false, el:null}; });
+
+    activeItems.forEach(function(itemObj){
+      var d = itemObj.def;
+      var g = document.createElement('div');
+      g.className = 'item-hit pulse-ring';
+      g.style.left = d.x + '%';
+      g.style.top = d.y + '%';
+      g.style.width = d.w + '%';
+      g.style.height = d.h + '%';
+      var ring = document.createElement('div');
+      ring.className = 'ring';
+      var img = document.createElement('img');
+      img.src = d.sprite;
+      g.appendChild(ring);
+      g.appendChild(img);
+      stage.appendChild(g);
+      itemObj.el = g;
+      g.addEventListener('click', function(){ handleFind(itemObj); });
+      g.addEventListener('touchstart', function(ev){ ev.preventDefault(); handleFind(itemObj); }, {passive:false});
+    });
+
+    buildKeyList();
+    sizeStage();
+  }
+
+  function buildKeyList(){
+    var list = document.getElementById('key-list');
+    list.innerHTML = '';
+    activeItems.forEach(function(itemObj){
+      var row = document.createElement('div');
+      row.className = 'key-item';
+      row.id = 'key-' + itemObj.def.id;
+      var img = document.createElement('img');
+      img.src = itemObj.def.icon;
+      var label = document.createElement('div');
+      label.className = 'kl';
+      label.textContent = itemObj.def.label;
+      var check = document.createElement('div');
+      check.className = 'key-check';
+      row.appendChild(img);
+      row.appendChild(label);
+      row.appendChild(check);
+      list.appendChild(row);
+    });
+  }
+
+  function handleFind(itemObj){
+    if(itemObj.found) return;
+    itemObj.found = true;
+    foundCount++;
+    document.getElementById('found-count').textContent = foundCount + '/' + ROUND_SIZE;
+    itemObj.el.classList.add('found');
+    itemObj.el.classList.remove('pulse-ring');
+    var keyRow = document.getElementById('key-' + itemObj.def.id);
+    if(keyRow) keyRow.classList.add('found');
+    spawnPopup();
+    if(foundCount >= ROUND_SIZE){ endGame(true); }
+  }
+
+  function spawnPopup(){
+    var p = document.createElement('div');
+    p.className = 'popup';
+    p.textContent = '+100';
+    var rect = stageWrap.getBoundingClientRect();
+    p.style.left = (rect.width/2 - 20) + 'px';
+    p.style.top = (rect.height*0.4) + 'px';
+    stageWrap.appendChild(p);
+    setTimeout(function(){ p.remove(); }, 1000);
+  }
+
+  function startGame(){
+    clearIdle();
+    foundCount = 0;
+    timeLeft = TOTAL_TIME;
+    document.getElementById('found-count').textContent = '0/' + ROUND_SIZE;
+    document.getElementById('timer-count').textContent = timeLeft;
+    document.getElementById('timerbar').style.width = '100%';
+    document.getElementById('timerbar').style.background = 'var(--caution)';
+    document.getElementById('timer-block').classList.remove('warning');
+    buildRound();
+    show('game');
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(function(){
+      timeLeft--;
+      document.getElementById('timer-count').textContent = Math.max(timeLeft,0);
+      var pct = Math.max(timeLeft,0) / TOTAL_TIME * 100;
+      document.getElementById('timerbar').style.width = pct + '%';
+      if(timeLeft <= 10){
+        document.getElementById('timer-block').classList.add('warning');
+        document.getElementById('timerbar').style.background = 'var(--danger)';
+      }
+      if(timeLeft <= 0){ endGame(false); }
+    }, 1000);
+  }
+
+  function stopGameTimers(){ clearInterval(timerInterval); }
+
+  var lastScore = 0, lastFound = 0, lastTimeLeft = 0;
+
+  function endGame(clearedAll){
+    stopGameTimers();
+    lastFound = foundCount;
+    lastTimeLeft = Math.max(timeLeft,0);
+    lastScore = foundCount*100 + lastTimeLeft*2;
+
+    document.getElementById('complete-eyebrow').textContent = clearedAll ? 'Mission Report' : "Time's Up";
+    var titleEl = document.querySelector('#screen-complete .stencil-title');
+    var titleText = clearedAll ? 'YARD CLEARED' : 'FALL BACK';
+    titleEl.textContent = titleText;
+    titleEl.setAttribute('data-text', titleText);
+
+    document.getElementById('result-found').textContent = 'Recovered: ' + lastFound + '/' + ROUND_SIZE;
+    document.getElementById('result-time').textContent = 'Time remaining: ' + lastTimeLeft + 's';
+    document.getElementById('result-score').textContent = lastScore;
+
+    resetNameEntry();
+    show('complete');
+    armIdleReset(45);
+  }
+
+  var currentName = '';
+  var MAX_NAME_LEN = 12;
+  var nameDisplay = document.getElementById('name-display');
+  var raffleNote = document.getElementById('raffle-note');
+
+  function resetNameEntry(){ currentName=''; raffleNote.style.visibility='hidden'; updateNameDisplay(); }
+  function updateNameDisplay(){
+    if(currentName.length === 0){ nameDisplay.textContent='YOUR NAME'; nameDisplay.classList.add('placeholder'); }
+    else { nameDisplay.textContent = currentName; nameDisplay.classList.remove('placeholder'); }
+  }
+
+  function buildKeyboard(){
+    var rows = ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];
+    var kb = document.getElementById('keyboard');
+    kb.innerHTML = '';
+    rows.forEach(function(row){
+      row.split('').forEach(function(ch){
+        var b = document.createElement('button');
+        b.className = 'key'; b.textContent = ch;
+        b.addEventListener('click', function(e){
+          e.stopPropagation();
+          if(currentName.length < MAX_NAME_LEN){ currentName += ch; updateNameDisplay(); }
+        });
+        kb.appendChild(b);
+      });
+    });
+    var space = document.createElement('button');
+    space.className = 'key wide'; space.textContent = 'SPACE';
+    space.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(currentName.length < MAX_NAME_LEN && currentName.length>0){ currentName += ' '; updateNameDisplay(); }
+    });
+    var back = document.createElement('button');
+    back.className = 'key wide'; back.textContent = 'DELETE';
+    back.addEventListener('click', function(e){ e.stopPropagation(); currentName = currentName.slice(0,-1); updateNameDisplay(); });
+    kb.appendChild(space); kb.appendChild(back);
+  }
+  buildKeyboard();
+
+  document.getElementById('btn-submit-name').addEventListener('click', function(e){
+    e.stopPropagation();
+    var finalName = currentName.trim();
+    if(finalName.length === 0) finalName = 'RECRUIT';
+    submitScore(finalName, lastScore);
+  });
+
+  // NOTE: GitHub Pages is static hosting -- there's no server to share data
+  // across devices, so the leaderboard is saved with localStorage. That means
+  // it persists reliably on ONE browser/device (exactly what you want for a
+  // single touchscreen kiosk running all conference), but a second kiosk or
+  // laptop would have its own separate leaderboard. If you ever need one
+  // shared leaderboard across multiple screens, that requires a small backend
+  // (e.g. Firebase/Supabase) -- ask if you want that built out instead.
+  var LB_KEY = 'sarge-leaderboard-entries';
+
+  function submitScore(name, score){
+    raffleNote.style.visibility = 'visible';
+    saveEntry(name, score);
+    showLeaderboard();
+  }
+
+  function saveEntry(name, score){
+    try{
+      var list = [];
+      var existing = localStorage.getItem(LB_KEY);
+      if(existing){ list = JSON.parse(existing); }
+      list.push({name:name, score:score, ts:Date.now()});
+      list.sort(function(a,b){ return b.score - a.score; });
+      list = list.slice(0, 25);
+      localStorage.setItem(LB_KEY, JSON.stringify(list));
+    }catch(e){ console.error('Storage error', e); }
+  }
+
+  function showLeaderboard(){
+    var board = document.getElementById('board');
+    board.innerHTML = '';
+    var list = [];
+    try{
+      var existing = localStorage.getItem(LB_KEY);
+      if(existing) list = JSON.parse(existing);
+    }catch(e){ list = []; }
+
+    if(list.length === 0){
+      board.innerHTML = '<div class="board-empty">No recruits on the board yet &mdash; be the first.</div>';
+    } else {
+      list.slice(0,10).forEach(function(entry, i){
+        var row = document.createElement('div');
+        row.className = 'board-row';
+        row.innerHTML = '<span class="rank">'+(i+1)+'</span><span class="name">'+escapeHtml(entry.name)+'</span><span class="score">'+entry.score+'</span>';
+        board.appendChild(row);
+      });
+    }
+    show('leaderboard');
+    armIdleReset(20);
+  }
+
+  function escapeHtml(str){ var d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
+
+  document.getElementById('btn-play-again').addEventListener('click', function(e){ e.stopPropagation(); resetToAttract(); });
+
+  ['screen-complete','screen-leaderboard'].forEach(function(id){
+    document.getElementById(id).addEventListener('click', function(){ armIdleReset(id==='screen-complete'?45:20); });
+  });
+
+})();
+</script>
+</body>
+</html>
