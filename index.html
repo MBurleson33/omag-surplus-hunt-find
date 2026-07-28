@@ -108,6 +108,10 @@
   .board-empty{padding:24px; color:var(--steel);}
 
   .staff-reset{position:absolute; bottom:10px; right:10px; width:32px; height:32px; border-radius:50%; background:var(--ground-dark); border:1px solid var(--steel-dark); color:var(--steel); font-size:15px; opacity:.35; z-index:50;}
+  .staff-fullscreen{position:absolute; bottom:10px; right:52px; width:32px; height:32px; border-radius:50%; background:var(--ground-dark); border:1px solid var(--steel-dark); color:var(--steel); font-size:15px; opacity:.35; z-index:50;}
+  #fullscreen-resume{position:absolute; inset:0; z-index:100; background:rgba(33,38,28,0.92); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .fs-resume-box{border:2px solid var(--caution); border-radius:12px; padding:28px 44px; text-align:center;}
+  .fs-resume-text{font-family:var(--font-display); font-size:28px; letter-spacing:.06em; color:var(--caution); text-transform:uppercase; animation:pulse 1.6s ease-in-out infinite;}
   .export-link{margin-top:16px; font-family:var(--font-mono); font-size:12px; letter-spacing:.1em; color:var(--steel); background:transparent; border:1px solid var(--steel-dark); border-radius:6px; padding:8px 16px; text-transform:uppercase; opacity:.6;}
 </style>
 </head>
@@ -182,7 +186,14 @@
     <button class="export-link" id="staff-export" title="Export raffle entries (CSV)">&#8595; EXPORT ENTRIES (STAFF)</button>
   </div>
 
+  <button class="staff-fullscreen" id="staff-fullscreen" title="Toggle fullscreen">&#9974;</button>
   <button class="staff-reset" id="staff-reset" title="Staff reset">&#8635;</button>
+
+  <div id="fullscreen-resume" style="display:none;">
+    <div class="fs-resume-box">
+      <div class="fs-resume-text">TAP TO RESUME FULLSCREEN</div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -247,6 +258,59 @@
   document.getElementById('btn-view-leaderboard').addEventListener('click', function(e){ e.stopPropagation(); showLeaderboard(); });
   document.getElementById('btn-start-hunt').addEventListener('click', function(e){ e.stopPropagation(); startGame(); });
   document.getElementById('staff-reset').addEventListener('click', function(e){ e.stopPropagation(); resetToAttract(); });
+
+  var fullscreenBtn = document.getElementById('staff-fullscreen');
+  function isFullscreen(){
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+  }
+  function updateFullscreenIcon(){
+    fullscreenBtn.innerHTML = isFullscreen() ? '&#10005;' : '&#9974;';
+    fullscreenBtn.title = isFullscreen() ? 'Exit fullscreen' : 'Enter fullscreen';
+  }
+  function toggleFullscreen(){
+    var el = document.documentElement;
+    if(!isFullscreen()){
+      var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if(req) req.call(el);
+    } else {
+      var exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if(exit) exit.call(document);
+    }
+  }
+  fullscreenBtn.addEventListener('click', function(e){ e.stopPropagation(); toggleFullscreen(); });
+  ['fullscreenchange','webkitfullscreenchange','MSFullscreenChange'].forEach(function(evt){
+    document.addEventListener(evt, updateFullscreenIcon);
+  });
+  updateFullscreenIcon();
+
+  // Browsers require a fresh user gesture to enter fullscreen after any real
+  // page load/reload -- JS cannot re-trigger it automatically, by design,
+  // for security reasons. The app's own idle-timeout reset does NOT reload
+  // the page (it just switches screens), so fullscreen persists through
+  // that on its own. This overlay only matters for an actual browser
+  // reload (manual refresh, crash recovery, kiosk software refreshing the
+  // tab, etc.) -- if the kiosk was previously running fullscreen, this
+  // shows a single full-screen tap target to restore it immediately
+  // instead of staff having to find the small corner button.
+  var wasFullscreenKey = 'sarge-was-fullscreen';
+  var resumeOverlay = document.getElementById('fullscreen-resume');
+
+  document.addEventListener('fullscreenchange', function(){
+    try{ sessionStorage.setItem(wasFullscreenKey, isFullscreen() ? '1' : '0'); }catch(e){}
+  });
+
+  function maybeShowResumePrompt(){
+    var wasFullscreen = false;
+    try{ wasFullscreen = sessionStorage.getItem(wasFullscreenKey) === '1'; }catch(e){}
+    if(wasFullscreen && !isFullscreen()){
+      resumeOverlay.style.display = 'flex';
+    }
+  }
+  resumeOverlay.addEventListener('click', function(){
+    toggleFullscreen();
+    resumeOverlay.style.display = 'none';
+  });
+  maybeShowResumePrompt();
   document.getElementById('staff-export').addEventListener('click', function(e){ e.stopPropagation(); exportEntriesCSV(); });
 
   function exportEntriesCSV(){
